@@ -1,40 +1,77 @@
-module.exports = {
-    mode: "production",
-  
-    // Enable sourcemaps for debugging webpack's output.
-    devtool: "source-map",
-  
+const path = require('path');
+const HtmlWebpackPlugin = require('html-webpack-plugin');
+const merge = require('webpack-merge');
+const devserver = require('./webpack/devserver');
+const typescript = require('./webpack/typescript');
+const sourceMap = require('./webpack/sourceMap');
+const css = require('./webpack/css');
+const lintCSS = require('./webpack/sass.lint.js');
+const extractCSS = require('./webpack/css.extract');
+const images = require('./webpack/images');
+const babel = require('./webpack/babel');
+const sass = require('./webpack/sass');
+
+const PATHS = {
+  source: path.join(__dirname, 'src'),
+  build: path.join(__dirname, 'build'),
+};
+
+const common = merge([
+  {
+    entry: {
+      'index': PATHS.source + '/index.tsx'
+    },
     resolve: {
-      // Add '.ts' and '.tsx' as resolvable extensions.
-      extensions: [".ts", ".tsx"]
+      extensions: ['.ts', '.tsx', '.js']
     },
-  
-    module: {
-      rules: [
-        {
-          test: /\.ts(x?)$/,
-          exclude: /node_modules/,
-          use: [
-            {
-              loader: "ts-loader"
-            }
-          ]
+    output: {
+      path: PATHS.build,
+      filename: './js/[name].js',
+    },
+    plugins: [
+      new HtmlWebpackPlugin({
+        filename: 'index.html',
+        chunks: ['index', 'common'],
+        template: PATHS.source + '/index.html',
+      }),
+    ],
+    optimization: {
+      splitChunks: {
+        cacheGroups: {
+          'common': {
+            minChunks: 2,
+            chunks: 'all',
+            name: 'common',
+            priority: 10,
+            enforce: true,
+          },
         },
-        // All output '.js' files will have any sourcemaps re-processed by 'source-map-loader'.
-        {
-          enforce: "pre",
-          test: /\.js$/,
-          loader: "source-map-loader"
-        }
-      ]
+      },
     },
-  
-    // When importing a module whose path matches one of the following, just
-    // assume a corresponding global variable exists and use that instead.
-    // This is important because it allows us to avoid bundling all of our
-    // dependencies, which allows browsers to cache those libraries between builds.
-    externals: {
-      react: "React",
-      "react-dom": "ReactDOM"
-    }
-  };
+    
+  },
+  typescript(),
+  lintCSS(),
+  images(),
+  babel(),
+  // lintJS({ paths: PATHS.sources }),
+]);
+
+module.exports = function(env, argv) {
+  if (argv.mode === 'production') {
+    return merge([
+      common,
+      extractCSS(),
+      // favicon(),
+    ]);
+  }
+  if (argv.mode === 'development') {
+    return merge([
+      common,
+      devserver(),
+      sass(),
+      css(),
+      sourceMap(),
+    ]);
+  }
+};
